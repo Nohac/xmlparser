@@ -46,7 +46,6 @@ If you are looking for a higher level solution, check out
 */
 
 #![no_std]
-
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![allow(ellipsis_inclusive_range_patterns)]
@@ -54,7 +53,6 @@ If you are looking for a higher level solution, check out
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
-
 
 macro_rules! matches {
     ($expression:expr, $($pattern:tt)+) => {
@@ -65,7 +63,6 @@ macro_rules! matches {
     }
 }
 
-
 mod error;
 mod stream;
 mod strspan;
@@ -75,7 +72,6 @@ pub use crate::error::*;
 pub use crate::stream::*;
 pub use crate::strspan::*;
 pub use crate::xmlchar::*;
-
 
 /// An XML token.
 #[allow(missing_docs)]
@@ -175,9 +171,7 @@ pub enum Token<'a> {
     /// ]>
     /// -- - span
     /// ```
-    DtdEnd {
-        span: StrSpan<'a>,
-    },
+    DtdEnd { span: StrSpan<'a> },
 
     /// Element start token.
     ///
@@ -245,9 +239,7 @@ pub enum Token<'a> {
     /// ```
     ///
     /// The token span is equal to the `text`.
-    Text {
-        text: StrSpan<'a>,
-    },
+    Text { text: StrSpan<'a> },
 
     /// CDATA token.
     ///
@@ -294,7 +286,6 @@ pub enum ElementEnd<'a> {
     Empty,
 }
 
-
 /// Representation of the [ExternalID](https://www.w3.org/TR/xml/#NT-ExternalID) value.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -302,7 +293,6 @@ pub enum ExternalId<'a> {
     System(StrSpan<'a>),
     Public(StrSpan<'a>, StrSpan<'a>),
 }
-
 
 /// Representation of the [EntityDef](https://www.w3.org/TR/xml/#NT-EntityDef) value.
 #[allow(missing_docs)]
@@ -312,10 +302,8 @@ pub enum EntityDefinition<'a> {
     ExternalId(ExternalId<'a>),
 }
 
-
 type Result<T> = core::result::Result<T, Error>;
 type StreamResult<T> = core::result::Result<T, StreamError>;
-
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum State {
@@ -328,7 +316,6 @@ enum State {
     AfterElements,
     End,
 }
-
 
 /// Tokenizer for the XML structure.
 #[derive(Clone)]
@@ -364,14 +351,11 @@ impl<'a> From<&'a str> for Tokenizer<'a> {
     }
 }
 
-
 macro_rules! map_err_at {
     ($fun:expr, $stream:expr, $err:ident) => {{
         let start = $stream.pos();
-        $fun.map_err(|e|
-            Error::$err(e, $stream.gen_text_pos_from(start))
-        )
-    }}
+        $fun.map_err(|e| Error::$err(e, $stream.gen_text_pos_from(start)))
+    }};
 }
 
 impl<'a> Tokenizer<'a> {
@@ -453,7 +437,9 @@ impl<'a> Tokenizer<'a> {
                         Ok(b'>') => {
                             self.state = State::AfterDtd;
                             s.advance(1);
-                            Some(Ok(Token::DtdEnd { span: s.slice_back(start) }))
+                            Some(Ok(Token::DtdEnd {
+                                span: s.slice_back(start),
+                            }))
                         }
                         Ok(c) => {
                             let e = StreamError::InvalidChar(c, b'>', s.gen_text_pos());
@@ -467,9 +453,9 @@ impl<'a> Tokenizer<'a> {
                 } else if s.starts_with_space() {
                     s.skip_spaces();
                     None
-                } else if    s.starts_with(b"<!ELEMENT")
-                          || s.starts_with(b"<!ATTLIST")
-                          || s.starts_with(b"<!NOTATION")
+                } else if s.starts_with(b"<!ELEMENT")
+                    || s.starts_with(b"<!ATTLIST")
+                    || s.starts_with(b"<!NOTATION")
                 {
                     if Self::consume_decl(s).is_err() {
                         let pos = s.gen_text_pos_from(start);
@@ -505,52 +491,46 @@ impl<'a> Tokenizer<'a> {
             State::Elements => {
                 // Use `match` only here, because only this section is performance-critical.
                 match s.curr_byte() {
-                    Ok(b'<') => {
-                        match s.next_byte() {
-                            Ok(b'!') => {
-                                if s.starts_with(b"<!--") {
-                                    Some(Self::parse_comment(s))
-                                } else if s.starts_with(b"<![CDATA[") {
-                                    Some(Self::parse_cdata(s))
-                                } else {
-                                    Some(Err(Error::UnknownToken(s.gen_text_pos())))
-                                }
-                            }
-                            Ok(b'?') => {
-                                if !s.starts_with(b"<?xml ") {
-                                    Some(Self::parse_pi(s))
-                                } else {
-                                    Some(Err(Error::UnknownToken(s.gen_text_pos())))
-                                }
-                            }
-                            Ok(b'/') => {
-                                if self.depth > 0 {
-                                    self.depth -= 1;
-                                }
-
-                                if self.depth == 0 && !self.fragment_parsing {
-                                    self.state = State::AfterElements;
-                                } else {
-                                    self.state = State::Elements;
-                                }
-
-                                Some(Self::parse_close_element(s))
-                            }
-                            Ok(_) => {
-                                self.state = State::Attributes;
-                                Some(Self::parse_element_start(s))
-                            }
-                            Err(_) => {
-                                return Some(Err(Error::UnknownToken(s.gen_text_pos())));
+                    Ok(b'<') => match s.next_byte() {
+                        Ok(b'!') => {
+                            if s.starts_with(b"<!--") {
+                                Some(Self::parse_comment(s))
+                            } else if s.starts_with(b"<![CDATA[") {
+                                Some(Self::parse_cdata(s))
+                            } else {
+                                Some(Err(Error::UnknownToken(s.gen_text_pos())))
                             }
                         }
-                    }
-                    Ok(_) => {
-                        Some(Self::parse_text(s))
-                    }
-                    Err(_) => {
-                        Some(Err(Error::UnknownToken(s.gen_text_pos())))
-                    }
+                        Ok(b'?') => {
+                            if !s.starts_with(b"<?xml ") {
+                                Some(Self::parse_pi(s))
+                            } else {
+                                Some(Err(Error::UnknownToken(s.gen_text_pos())))
+                            }
+                        }
+                        Ok(b'/') => {
+                            if self.depth > 0 {
+                                self.depth -= 1;
+                            }
+
+                            if self.depth == 0 && !self.fragment_parsing {
+                                self.state = State::AfterElements;
+                            } else {
+                                self.state = State::Elements;
+                            }
+
+                            Some(Self::parse_close_element(s))
+                        }
+                        Ok(_) => {
+                            self.state = State::Attributes;
+                            Some(Self::parse_element_start(s))
+                        }
+                        Err(_) => {
+                            return Some(Err(Error::UnknownToken(s.gen_text_pos())));
+                        }
+                    },
+                    Ok(_) => Some(Self::parse_text(s)),
+                    Err(_) => Some(Err(Error::UnknownToken(s.gen_text_pos()))),
                 }
             }
             State::Attributes => {
@@ -586,9 +566,7 @@ impl<'a> Tokenizer<'a> {
                     Some(Err(Error::UnknownToken(s.gen_text_pos())))
                 }
             }
-            State::End => {
-                None
-            }
+            State::End => None,
         }
     }
 
@@ -602,7 +580,10 @@ impl<'a> Tokenizer<'a> {
             if s.starts_with_space() {
                 s.skip_spaces();
             } else if !s.starts_with(b"?>") && !s.at_end() {
-                return Err(StreamError::InvalidSpace(s.curr_byte_unchecked(), s.gen_text_pos()));
+                return Err(StreamError::InvalidSpace(
+                    s.curr_byte_unchecked(),
+                    s.gen_text_pos(),
+                ));
             }
 
             Ok(())
@@ -625,7 +606,12 @@ impl<'a> Tokenizer<'a> {
         s.skip_string(b"?>")?;
 
         let span = s.slice_back(start);
-        Ok(Token::Declaration { version, encoding, standalone, span })
+        Ok(Token::Declaration {
+            version,
+            encoding,
+            standalone,
+            span,
+        })
     }
 
     // VersionInfo ::= S 'version' Eq ("'" VersionNum "'" | '"' VersionNum '"')
@@ -659,11 +645,7 @@ impl<'a> Tokenizer<'a> {
         // [A-Za-z] ([A-Za-z0-9._] | '-')*
         // TODO: check that first byte is [A-Za-z]
         let name = s.consume_bytes(|_, c| {
-               c.is_xml_letter()
-            || c.is_xml_digit()
-            || c == b'.'
-            || c == b'-'
-            || c == b'_'
+            c.is_xml_letter() || c.is_xml_digit() || c == b'.' || c == b'-' || c == b'_'
         });
         s.consume_byte(quote)?;
 
@@ -746,7 +728,11 @@ impl<'a> Tokenizer<'a> {
 
         let span = s.slice_back(start);
 
-        Ok(Token::ProcessingInstruction { target, content, span })
+        Ok(Token::ProcessingInstruction {
+            target,
+            content,
+            span,
+        })
     }
 
     fn parse_doctype(s: &mut Stream<'a>) -> Result<Token<'a>> {
@@ -766,18 +752,30 @@ impl<'a> Tokenizer<'a> {
         s.skip_spaces();
 
         let c = s.curr_byte()?;
-        if c != b'[' && c !=  b'>' {
+        if c != b'[' && c != b'>' {
             static EXPECTED: &[u8] = &[b'[', b'>'];
-            return Err(StreamError::InvalidCharMultiple(c, EXPECTED, s.gen_text_pos()));
+            return Err(StreamError::InvalidCharMultiple(
+                c,
+                EXPECTED,
+                s.gen_text_pos(),
+            ));
         }
 
         s.advance(1);
 
         let span = s.slice_back(start);
         if c == b'[' {
-            Ok(Token::DtdStart { name, external_id, span })
+            Ok(Token::DtdStart {
+                name,
+                external_id,
+                span,
+            })
         } else {
-            Ok(Token::EmptyDtd { name, external_id, span })
+            Ok(Token::EmptyDtd {
+                name,
+                external_id,
+                span,
+            })
         }
     }
 
@@ -840,7 +838,11 @@ impl<'a> Tokenizer<'a> {
 
         let span = s.slice_back(start);
 
-        Ok(Token::EntityDeclaration { name, definition, span })
+        Ok(Token::EntityDeclaration {
+            name,
+            definition,
+            span,
+        })
     }
 
     // EntityDef   ::= EntityValue | (ExternalID NDataDecl?)
@@ -918,7 +920,11 @@ impl<'a> Tokenizer<'a> {
         let (prefix, local) = s.consume_qname()?;
         let span = s.slice_back(start);
 
-        Ok(Token::ElementStart { prefix, local, span })
+        Ok(Token::ElementStart {
+            prefix,
+            local,
+            span,
+        })
     }
 
     fn parse_close_element(s: &mut Stream<'a>) -> Result<Token<'a>> {
@@ -936,7 +942,10 @@ impl<'a> Tokenizer<'a> {
 
         let span = s.slice_back(start);
 
-        Ok(Token::ElementEnd { end: ElementEnd::Close(prefix, tag_name), span })
+        Ok(Token::ElementEnd {
+            end: ElementEnd::Close(prefix, tag_name),
+            span,
+        })
     }
 
     // Name Eq AttValue
@@ -953,12 +962,18 @@ impl<'a> Tokenizer<'a> {
                     s.advance(1);
                     s.consume_byte(b'>')?;
                     let span = s.slice_back(start);
-                    return Ok(Token::ElementEnd { end: ElementEnd::Empty, span });
+                    return Ok(Token::ElementEnd {
+                        end: ElementEnd::Empty,
+                        span,
+                    });
                 }
                 b'>' => {
                     s.advance(1);
                     let span = s.slice_back(start);
-                    return Ok(Token::ElementEnd { end: ElementEnd::Open, span });
+                    return Ok(Token::ElementEnd {
+                        end: ElementEnd::Open,
+                        span,
+                    });
                 }
                 _ => {}
             }
@@ -967,8 +982,9 @@ impl<'a> Tokenizer<'a> {
         if !has_space {
             if !s.at_end() {
                 return Err(StreamError::InvalidSpace(
-                    s.curr_byte_unchecked(), s.gen_text_pos_from(attr_start))
-                );
+                    s.curr_byte_unchecked(),
+                    s.gen_text_pos_from(attr_start),
+                ));
             } else {
                 return Err(StreamError::UnexpectedEndOfStream);
             }
@@ -985,7 +1001,12 @@ impl<'a> Tokenizer<'a> {
         s.consume_byte(quote)?;
         let span = s.slice_back(start);
 
-        Ok(Token::Attribute { prefix, local, value, span })
+        Ok(Token::Attribute {
+            prefix,
+            local,
+            value,
+            span,
+        })
     }
 
     fn parse_text(s: &mut Stream<'a>) -> Result<Token<'a>> {
