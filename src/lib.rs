@@ -323,6 +323,7 @@ pub struct Tokenizer<'a> {
     stream: Stream<'a>,
     state: State,
     depth: usize,
+    continue_on_error: bool,
     fragment_parsing: bool,
 }
 
@@ -346,6 +347,7 @@ impl<'a> From<&'a str> for Tokenizer<'a> {
             stream,
             state: State::Declaration,
             depth: 0,
+            continue_on_error: false,
             fragment_parsing: false,
         }
     }
@@ -370,8 +372,17 @@ impl<'a> Tokenizer<'a> {
             stream: Stream::from_substr(full_text, fragment),
             state: State::Elements,
             depth: 0,
+            continue_on_error: false,
             fragment_parsing: true,
         }
+    }
+
+    /// Enable continue on error mode.
+    ///
+    /// By default `xmlparser` will stop parsing on the first error.
+    pub fn continue_on_error(mut self, cont: bool) -> Self {
+        self.continue_on_error = cont;
+        self
     }
 
     fn parse_next_impl(&mut self) -> Option<Result<Token<'a>>> {
@@ -548,7 +559,12 @@ impl<'a> Tokenizer<'a> {
                     }
                 }
 
-                Some(t.map_err(|e| Error::InvalidAttribute(e, s.gen_text_pos_from(start))))
+                Some(t.map_err(|e| {
+                    let pos = s.gen_text_pos_from(start);
+                    let err = Error::InvalidAttribute(e, pos.clone());
+                    s.skip_until_spaces();
+                    err
+                }))
             }
             State::AfterElements => {
                 if s.starts_with(b"<!--") {
@@ -1045,7 +1061,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             t = self.parse_next_impl();
         }
 
-        if let Some(Err(_)) = t {
+        if t.is_some_and(|t| t.is_err()) && !self.continue_on_error {
             self.stream.jump_to_end();
             self.state = State::End;
         }

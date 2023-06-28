@@ -314,6 +314,16 @@ impl<'a> Stream<'a> {
         }
     }
 
+    /// Skips until spaces
+    ///
+    /// Accepted values: `' ' \n \r \t`.
+    #[inline]
+    pub fn skip_until_spaces(&mut self) {
+        while !self.at_end() && !self.curr_byte_unchecked().is_xml_space() {
+            self.advance(1);
+        }
+    }
+
     /// Checks if the stream is starts with a space.
     #[inline]
     pub fn starts_with_space(&self) -> bool {
