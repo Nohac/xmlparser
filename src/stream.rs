@@ -610,6 +610,46 @@ impl<'a> Stream<'a> {
         s.gen_text_pos()
     }
 
+    /// Generates the offset in the file from a given `TextPos`.
+    ///
+    /// This function takes a `TextPos` object, which specifies a row and column in the text,
+    /// and calculates the offset in the file that corresponds to this position. The offset is
+    /// the total number of characters from the start of the file to the specified position.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use xmlparser::{Stream, TextPos};
+    /// let s = Stream::from("Hello\nWorld\nFoo\nBar");
+    /// let target_offset = 17;
+    /// let text_pos = s.gen_text_pos_from(target_offset);
+    /// let offset = s.gen_offset_from_text_pos(text_pos);
+    /// assert_eq!(offset, target_offset);
+    /// ```
+    pub fn gen_offset_from_text_pos(&self, text_pos: TextPos) -> usize {
+        let mut row = 1;
+        let mut col = 1;
+        let mut offset = 0;
+
+        for c in self.span.as_str().chars() {
+            if row == text_pos.row && col == text_pos.col {
+                break;
+            }
+
+            // TODO: Improve line break handling to support crlf cr and lf.
+            if c == '\n' {
+                row += 1;
+                col = 1;
+            } else {
+                col += 1;
+            }
+
+            offset += c.len_utf8();
+        }
+
+        offset
+    }
+
     fn calc_curr_row(text: &str, end: usize) -> u32 {
         let mut row = 1;
         for c in &text.as_bytes()[..end] {
